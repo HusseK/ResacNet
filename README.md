@@ -1,5 +1,6 @@
 # ResacNet
-Downscaling of ocean fields by fusion of heterogeneous observations using Deep Learning algorithms
+Downscaling of ocean fields by fusion of heterogeneous observations using Deep Learning algorithms.
+
 We present a method to increase low resolution satellite data fields by merging them with high
 resolution data provided by additional sensors. The merging was achieved using deep learning
 algorithms, in the present study Convolution Neural Networks (CNN). Experiments were conducted on
