@@ -14,10 +14,10 @@ from   resacartdef import *
 #######################################################################
 #======================================================================
 # Lecture Des Donn�es
-Data_       = np.load("../donnees/natl60_htuv_01102012_01102013.npz")
+Data_       = np.load("../donnees/natl60_htuv_01102012_01102013.npz") #Chemin vers le fichier à modifier selon la situation
 FdataAllVar = Data_['FdataAllVar']
 varlue      = list(Data_['varlue'])
-varlue      = [i.decode() for i in varlue]
+varlue      = [i.decode() for i in varlue] #Pour enlever les b devant les chaines de caractères
 
 Nvar_, Nimg_, Nlig_, Ncol_ = np.shape(FdataAllVar) #(4L, 366L, 1296L, 1377L) 
 #          
