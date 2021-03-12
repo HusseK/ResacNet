@@ -23,11 +23,11 @@ import matplotlib as mpl #see: ../matplotlib/rcsetup.py
 mpl.rcParams['figure.facecolor'] = 'w';
 mpl.rcParams['figure.figsize']   = [12, 9];
 x_figtitlesize  = 14;
-x_figsuptitsize = 14;
+x_figsuptitsize = 14
 from  matplotlib import cm;
 #
 # . D�finition des norms et �chelles d'affichage des variables
-tvwmm  = ["SSH",  "SST",  "SSU",  "SSV",   "NRJ",     "ENS",   "ADD",  "MUL"];
+tvwmm  = ["SSH",  "SST",  "U",  "V",   "NRJ",     "ENS",   "ADD",  "MUL"];
 wnorm  = [ None,  None,   None,   None,    "Log",     "Log",    None,  None];
 wbmin  = [-0.67,  -2.30,  -2.25,  -2.50, 4.0849e-10, 3.868e-25,  0.0,   0.0 ]; 
 wbmax  = [ 1.36,  30.00,   2.60,   2.35,   3.52,     1.158e-09, 3.52,  1.34e-09];
@@ -95,7 +95,7 @@ acide = 0;  # seed plac� pour l'init de l'architecture
 # Ps: loss='logcosh' and optimizer='adam' are in DURE in the code
 #
 #----------------------------------------------------------------------
-SCENARCHI = 2;  # 0 : Produire des figures sur les donn�es brute
+SCENARCHI = 3;  # 0 : Produire des figures sur les donn�es brute
                 #     sans faire de  CNN.
                 # 1 : CNN Resac_inf (EXP1=EXP_ssh); 
                 # 2 : CNN Resac (EXP2=EXP_ssh_sst);
@@ -124,13 +124,20 @@ if SCENARCHI == 0 : # Pour produire des figures � diff�rentes r�solutions
     varIn   = ["SSH"];                          varOut  = ["SSH"];    
     ResoIn  = [ 81];                            ResoOut = [ 27  ];
 elif SCENARCHI == 1 : #RESAC_inf (sans SST) 'kmodel/kmodel_ktd3_366';
-    varIn     = ["SSH"];                    varOut  = ["SSH","SSH","SSU","SSV"];
+    varIn     = ["SSH"];                    varOut  = ["SSH","SSH","U","V"];
     ResoIn    = [  81];                     ResoOut = [  27,   9,    9,    9];
     targetout = [1, 2, 3];
-elif SCENARCHI == 2 : #RESAC (avec SST) #'kmodel/kmodel_ktd10_366'; 402113w
-    varIn  = ["SSH","SST","SST"];           varOut  = ["SSH","SSH","SSU","SSV"];
+elif SCENARCHI == 2 : #RESAC (avec SST) #'kmodel/kmodel_ktd10_366'; 402113w # 
+    #                          RESAC 81 TO 09                             #
+    varIn  = ["SSH","SST","SST"];           varOut  = ["SSH","SSH","U","V"];
     ResoIn = [  81,  27,    9 ];            ResoOut = [  27,   9,    9,    9];
     targetout = [1, 2, 3];
+
+elif SCENARCHI == 3 : #RESAC (avec SST) #'kmodel/kmodel_ktd10_366'; 402113w
+    #                          RESAC 81 TO 03
+    varIn  = ["SSH","SST","SST","SST"];           varOut  = ["SSH","SSH","SSH","U","V"];
+    ResoIn = [  81,  27,    9,    3];            ResoOut =  [  27,   9,    3,    3,    3];
+    targetout = [1, 2, 3, 4];
 else :
     raise ValueError("Create another archi");
 #
@@ -153,34 +160,50 @@ if (TEST_ON and pcentT<=0.0) or (VALID_ON and pcentV<=0.0) :
     raise ValueError("Your pcentT or pcentV is not OK");
 #
 if SCENARCHI > 0 :
-    RUN_MODE = "LEARN";  
+    RUN_MODE = "LEARN"
+    #RUN_MODE = "REPRENDRE"
+    #RUN_MODE="RESUME"  
              # "LEARN" : On effectue des it�rations d'apprentissage.
              # "RESUME": Les poids d'un mod�le sauvegard� pr�c�demment 
-             # sont recharg�s avec le nom du param�tre Mdl2save ci-dessous 
+             # sont recharg�s avec le nom du param�tre Mdl2save ci-dessous
+             # "REPRENDRE": reprendre l'apprentissage à partir d'un checkpoint
+             # avec les poids du modèle  
     #
     # Nom de fichier pour les poids d'un modele
     if RUN_MODE == "LEARN" :
         # Nom du du fichier � sauvegarder
-        Mdl2save = 'SaveModel/modelk'; # Nom par defaut
+        Mdl2save = 'Save_Model/'; # Nom par defaut
+        history_filename=Mdl2save+"Historique_Loss/modelkhistory.pkl"
     elif RUN_MODE == "RESUME" :
         # Nom du du fichier � recharger 
         if SCENARCHI == 1 :   # RESAC sans SST
-            Mdl2reload = 'kmodel/kmodel_ktd3_366';    
+            Mdl2reload = 'kmodel/kmodel_ktd3_366';  
+            
         elif SCENARCHI == 2 : # RESAC avec SST
-            Mdl2reload = 'SaveModel/modelk'
+            Mdl2reload = Mdl2save+'Weights/modelkvalid.ckpt'
+            
+        elif SCENARCHI == 3: # RESAC avec SST de 81 à 3
+            Mdl2reload = Mdl2save+'Weights/modelkvalid.ckpt'
         else :
-            Mdl2reload = 'SaveModel/modelk'; # Nom par d�faut, suppose avoir �t� cr�e avant
+            print("Scenario pas encore prevu") # Nom par d�faut, suppose avoir �t� cr�e avant
+    elif RUN_MODE=="REPRENDRE":
+        if SCENARCHI == 1: #RESAC sans SST
+            print("Ce scenario n'est pas prévu")
+        elif SCENARCHI == 3: #RESAC AVEC SST
+            Mdl2reprendre_archi = 'SaveArchi_reprendre'
+            Mdl2reprendre_poids = 'SaveModel_reprendre/modelkvalid.ckpt'
     else :
         raise ValueError("Bad RUN MODE");
     #
-    if RUN_MODE == "LEARN" and Mdl2save != "SaveModel/modelk" :   
+    if RUN_MODE == "LEARN" and Mdl2save != "Save_Model/" :   
         _rep = input("Are you shure ? : "); 
         if _rep != 1 :
             raise ValueError("Are you not shure hein !");    
     #
-    Niter, Bsize = (5100, 29);
+    #Niter, Bsize = (5100, 29);
     #Niter, Bsize  = (3, 13);
-    #Niter, Bsize=(20,10)
+    #Niter, Bsize = (3200,29)
+    Niter, Bsize= (2100, 29)
     #
     #======================================================================
     # Param�tre de Visualisation (2) des r�sultats

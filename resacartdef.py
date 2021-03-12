@@ -1,7 +1,9 @@
-# -*- coding: cp1252 -*-
+# -*- coding: utf-8 -*-
 from __future__ import print_function
 import os
 import sys
+import pickle
+import random
 from   time  import time
 import numpy as     np
 import matplotlib as mpl #see: ../matplotlib/rcsetup.py
@@ -10,6 +12,7 @@ from   matplotlib import cm
 import matplotlib.colorbar as cb
 from   matplotlib.colors import LogNorm
 from   scipy.stats import norm
+from keras.callbacks import Callback
 from   resacartparm  import *
 #=====================================================================
 # Traitement post param�trage
@@ -25,7 +28,7 @@ if SCENARCHI>0 :
 NvarIn    = len(varIn);     NvarOut= len(varOut);
 IS_UVout  = False;
 IS_HUVout = False;
-if "SSU" in varOut and "SSV" in varOut :
+if "U" in varOut and "V" in varOut :
     IS_UVout  = True;    
     if "SSH" in varOut :
         IS_HUVout = True;   
@@ -505,8 +508,8 @@ def showhquiv(Voutb, im2show, qscale=None, qmask=None, qmode=None,
     #print("-- in showhquiv --");
     if calX0 is not None :
         calX0_ = calX0[im2show];
-    iu_ = varOut.index("SSU");
-    iv_ = varOut.index("SSV");
+    iu_ = varOut.index("U");
+    iv_ = varOut.index("V");
     ih_ = varOut.index("SSH",np.min([iu_,iv_])-1); # le dernier h avant u et v        
     H_  = Voutb[ih_][im2show,0,:,:];
     U_  = Voutb[iu_][im2show,0,:,:];
@@ -693,9 +696,14 @@ def setbins(mmax, mmin, nbins) :
     bins  = np.arange(mmin, mmaxX, (mmax-mmin)/nbins);
     bins[-1] = bins[-1] + epsi;
     return bins
+
 def getrticks (Nlig) :
     # get r�solution et ticks
-    reso    = NLigR01/Nlig; #=NColR01/NC_
+    print("NLigR01: ",NLigR01)
+    print("NLig: ",Nlig)
+    reso    = (NLigR01//Nlig)+1; #=NColR01/NC_ #####A reprendre#######
+    print("Reso:",reso)
+    print("ResoAll:",ResoAll)
     icoord  = ResoAll.index(reso);
     xxticks, lxticks, yyticks, lyticks = CoordGeo[icoord];
     return reso, xxticks, lxticks, yyticks, lyticks    
@@ -724,6 +732,7 @@ def result(lib, strset, varname, Yref, Yest, flag_rms=0, flag_scat=0,
            flag_histo=0, nbins=NBINS, calX=None) :
     print("-- in result --"); #print(np.shape(Yref)); #(55L, 1L, 144L, 153L)
     # Au moins toujours la RMS qui est affich�e par ailleurs
+    Nall_ = np.prod(np.shape(Yest));
     N_ = len(Yref); Allrmsi = [];
     for i in np.arange(N_) :
         rmsi, Nnan, inan = nanrms(Yref[i], Yest[i]);
@@ -731,7 +740,10 @@ def result(lib, strset, varname, Yref, Yest, flag_rms=0, flag_scat=0,
     moyAllrmsi = np.mean(Allrmsi);
     titres_ = "%s %s %s, RMS by image, Mean : %.4f\n min=%.4f, max=%.4f, std=%.4f" \
                %(strset, varname, lib, moyAllrmsi, np.min(Allrmsi), np.max(Allrmsi), np.std(Allrmsi));
-    nom_save="%s_%s_%s_RMS_BY_IMAGE"%(strset, varname, lib)
+    nom_save="%s_%s_%s_RMS_BY_IMAGE_(%d pixels)"%(strset, varname, lib,Nall_)
+    if RUN_MODE=="REPRENDRE":
+        nom_save+="REPRENDRE"
+
     print(titres_);
     #
     if flag_rms and FIGBYIMGS : # figure RMS par image
@@ -746,9 +758,9 @@ def result(lib, strset, varname, Yref, Yest, flag_rms=0, flag_scat=0,
             #horizontalalignment='right', verticalalignment='baseline')          
         plt.plot([0,N_-1],[moyAllrmsi, moyAllrmsi]); # Trait de la moyenne
         plt.title(titres_, fontsize=x_figtitlesize);
-        plt.savefig("Images/"+nom_save+".png")       
+        plt.savefig(Mdl2save+"Images/"+nom_save+".png")       
     #
-    Nall_ = np.prod(np.shape(Yest));
+    
     Yref_ = Yref.ravel();
     Yest_ = Yest.ravel();
     #                  
@@ -757,7 +769,9 @@ def result(lib, strset, varname, Yref, Yest, flag_rms=0, flag_scat=0,
         plt.title("%s %s %s scatter plot (%d pixels)\n mean(rms)=%.6f, R2=%f"
                   %(strset, varname, lib, Nall_, moyAllrmsi, R2), fontsize=x_figtitlesize);
         nom_save2="%s_%s_%sscatter_plot_(%d_pixels)"%(strset, varname, lib, Nall_)
-        plt.savefig("Images/"+nom_save2+"scatt.png")
+        if RUN_MODE=="REPRENDRE":
+            nom_save2+="REPRENDRE"
+        plt.savefig(Mdl2save+"Images/"+nom_save2+"scatt.png")
 
     if flag_histo : # Histogramme des diff�rences
         Ydif_ = Yref_-Yest_;
@@ -774,7 +788,9 @@ def result(lib, strset, varname, Yref, Yest, flag_rms=0, flag_scat=0,
             plt.title("%s %s %s Histo des differences (Ref.-Est.)\n(%dbins)(%d pixels(%dnans) %dloss), mean(rms)=%.6f"
                       %(strset, varname, lib, nbins, Nall_, Nnan, Nall_-sum(BI[0]), moyAllrmsi), fontsize=x_figtitlesize);
             nom_save3="%s_%s_%s_Histo_des_differences"%(strset, varname, lib)
-            plt.savefig("Images/"+nom_save3+"histo_non_norm.png")
+            if RUN_MODE=="REPRENDRE":
+                nom_save3+="REPRENDRE"
+            plt.savefig(Mdl2save+"Images/"+nom_save3+"histo_non_norm.png")
 
         # Histogramme Normalis�
         plt.figure();
@@ -792,10 +808,12 @@ def result(lib, strset, varname, Yref, Yest, flag_rms=0, flag_scat=0,
         y      = norm.pdf(Centre, ymoy, ystd);
         plt.plot(Centre, y, '-*r', linewidth=3);
         plt.axis([mmin, mmax, 0, NBmax_]);
-        plt.title("%s %s %s Histo Normalise des Diff.(Ref.-Est.)\n mean=%f, std=%f, mean(rms)=%.6f"
-                  %(strset, varname, lib, np.mean(Ydif_), np.std(Ydif_), moyAllrmsi));
+        plt.title("%s %s %s Histo Normalise des Diff.(Ref.-Est.)\n mean=%f, std=%f, %dpixels mean(rms)=%.6f"
+                  %(strset, varname, lib, np.mean(Ydif_), np.std(Ydif_),Nall_, moyAllrmsi));
         nom_save4="%s_%s_%s_Histo_Normalise_des_Diff"%(strset, varname, lib)
-        plt.savefig("Images/"+nom_save4+"histo_norm.png")                    
+        if RUN_MODE=="REPRENDRE":
+            nom_save4+="REPRENDRE"
+        plt.savefig(Mdl2save+"Images/"+nom_save4+"histo_norm.png")                    
 #
 #----------------------------------------------------------------------      
 def distcosine2D (Wref, West) : # Matrix way
@@ -1089,8 +1107,8 @@ def resultuv(Yrefout, Yestout, strset, flag_cosim=0, flag_nrj=0,
              flag_ens=0, flag_corrplex=0, flag_div=0, dx=dxRout, dy=dyRout,
              flag_scat=0, flag_histo=0, calX=None, wdif='log', nbins=NBINS) :
     print("-- in resultuv --");
-    iu_ = varOut.index("SSU");  Urefout = Yrefout[iu_];  Uestout = Yestout[iu_];
-    iv_ = varOut.index("SSV");  Vrefout = Yrefout[iv_];  Vestout = Yestout[iv_];       
+    iu_ = varOut.index("U");  Urefout = Yrefout[iu_];  Uestout = Yestout[iu_];
+    iv_ = varOut.index("V");  Vrefout = Yrefout[iv_];  Vestout = Yestout[iv_];       
     if LIMLAT_NORDSUD <= 0 :
         UVresult(Urefout, Vrefout, Uestout, Vestout, strset, flag_cosim=flag_cosim,
                  flag_nrj=flag_nrj, flag_ens=flag_ens,
@@ -1119,7 +1137,36 @@ def resultuv(Yrefout, Yestout, strset, flag_cosim=0, flag_nrj=0,
              flag_nrj=flag_nrj, flag_ens=flag_ens,
              flag_corrplex=flag_corrplex, flag_div=flag_div, dx=dx, dy=dy,
              flag_scat=flag_scat, flag_histo=flag_histo, calX=calX,
-             wdif=wdif, nbins=nbins); 
+             wdif=wdif, nbins=nbins);
+#--------------------------------------------------
+def saveHist(path, history):
+    with open(path, 'wb') as file:
+        pickle.dump(history, file)
+#--------------------------------------------------
+def appendHist(h1, h2):
+    if h1 == {}:
+        return h2
+    else:
+        dest = {}
+        for key, value in h1.items():
+            dest[key] = value + h2[key]
+        return dest
+#--------------------------------------------------
+class LossHistory(Callback):
+  
+    def on_epoch_end(self, epoch, logs = None):
+        new_history={}
+        for k, v in logs.items(): # compile new history from logs
+            new_history[k] = [v] # convert values into lists
+        try:
+            with open(history_filename, 'rb') as file:
+                old_history=pickle.load(file)
+        except:
+            print("Fail au moment du chargement du fichier "+history_filename)
+            old_history={}
+    
+
+        saveHist(history_filename, appendHist(old_history,new_history)) # save history from current training             
 #**********************************************************************
 #----------------------------------------------------------------------
 #
