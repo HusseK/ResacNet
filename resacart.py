@@ -3,6 +3,7 @@ from __future__ import print_function
 import os
 import sys
 from   time  import time
+import datetime
 import numpy as np
 import matplotlib.pyplot as plt
 from   matplotlib  import cm
@@ -13,7 +14,7 @@ from   resacartdef import *
 #           GET AND SET THE REQUIRED BRUTE DATA
 #######################################################################
 #======================================================================
-# Lecture Des Donn�es
+#%% Lecture Des Donn�es
 Data_       = np.load("../donnees/natl60_htuv_01102012_01102013.npz") # A changer en fonction du chemin d'accès aux données
 FdataAllVar = Data_['FdataAllVar']
 varlue      = list(Data_['varlue'])
@@ -22,7 +23,9 @@ varlue[2]="U"
 varlue[3]="V"
 
 Nvar_, Nimg_, Nlig_, Ncol_ = np.shape(FdataAllVar) #(4L, 366L, 1296L, 1377L) 
-#          
+#%%          
+
+
 if FLAG_STAT_BASE_BRUTE : # Statistiques de base sur les variables brutes lues (->PPT)
     print("Statistique de base sur les variables brutes lues")
     stat2base(FdataAllVar, varlue)
@@ -34,7 +37,7 @@ if FLAG_STAT_BASE_BRUTE : # Statistiques de base sur les variables brutes lues (
             print("%s Sud : "%varlue[i], end='') 
             statibase(XiSud_)
         del XiNord_, XiSud_
-#
+#%%
 # Splitset Ens App - Val - Test
 print("Splitset Ens App - Val - Test ...", end='')
 indA, indV, indT = isetalea(Nimg_, pcentSet)
@@ -133,7 +136,7 @@ if FLAG_DAILY_MOY_EE and IS_UVout :
           %(pcentN_, pcentS_, pcentN_+pcentS_))
     del ENS_, moyENS_, XN_, XS_, sumENS_, sumENSS_, sumENSN_
     del Uall_, Vall_
-#
+#%%
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 print("# Mise en forme") 
 for i in np.arange(NvarIn) :  # App In
@@ -195,6 +198,8 @@ if SIGT_NOISE > 0 :
 #======================================================================
 if VisuBA+VisuBV+VisuBT > 0 :
     print("# Visualisation des donn�es brutes")
+    
+#%%
 #----------------------------------------------------------------------
 def visuB (X_brute, varIO, VisuB, Ndon, strset, inout, im2show,
            qmask=None, qscale=None, qmode=None, calX0=None) :
@@ -246,7 +251,7 @@ if VisuBstop or SCENARCHI==0 :
     print("STOP after visu donn�es brutes")
     plt.show() 
     sys.exit(0)
-#
+#%%
 #======================================================================
 #                   CODIFICATION / NORMALISATION
 #======================================================================
@@ -313,6 +318,8 @@ if VALID_ON : # Il faut appliquer le m�me codage et dans les m�mes condition
 #----------------------------------------------------------------------
 # POUR AVOIR CHANEL LAST, en Linux dans ~/.keras/keras.json
 # Windowd c:/Users/charles/.keras/keras.json
+#y_test_brute=[]
+#y_train_brute=[]
 for i in np.arange(NvarIn):
     x_train[i] = x_train[i].transpose(0,2,3,1)
     x_valid[i] = x_valid[i].transpose(0,2,3,1)
@@ -321,6 +328,8 @@ for i in np.arange(NvarOut):
     y_train[i] = y_train[i].transpose(0,2,3,1)
     y_valid[i] = y_valid[i].transpose(0,2,3,1)
     y_test[i] = y_test[i].transpose(0,2,3,1)
+#    y_test_brute.append( VTout_brute[i].transpose(0,2,3,1))
+#    y_train_brute.append(VAout_brute[i].transpose(0,2,3,1))
 #----------------------------------------------------------------------
 
 if 1 : # Affichage des shapes ...
@@ -340,7 +349,7 @@ if 1 : # Affichage des shapes ...
             print("%s shape y_test : "%varOut[i], np.shape(y_test[i]))
             
             
-
+#%%
 #======================================================================
 #######################################################################
 #                       THE ARCHITECTURE
@@ -352,6 +361,7 @@ from keras.layers import Conv2D, MaxPooling2D, UpSampling2D #, Deconvolution2D
 from keras.layers import Concatenate, concatenate 
 from keras.models    import Model
 from keras.models    import load_model
+import keras.callbacks
 from keras.callbacks import EarlyStopping, ModelCheckpoint
 #----------------------------------------------------------------------
 if 1 : # Avoir sa propre fonction d'activation
@@ -491,7 +501,7 @@ Mdl   = Model(all_Kinput_img, ArchiOut)
 Mdl.summary(); 
 Mdl.compile(loss='logcosh', optimizer='adam')
 print("Architecture completed")
-
+#%%
 #
 #======================================================================
 #                LEARNING (ou reprendre)
@@ -499,19 +509,40 @@ print("\nLEARNING (ou reprendre) :", RUN_MODE)
 #======================================================================
 if RUN_MODE=="RESUME" :
     print("Reload des poids d'un model préalablement sauvegardé")
-    Mdl.load_weights(Mdl2reload+"valid.ckpt"); 
+    Mdl.load_weights(Mdl2reload); 
     print("reload weights, done that")
 #
 elif RUN_MODE=="REPRENDRE":
-    print("Reprendre l'apprentissage à partir du checkpoint")
+    try:
+        os.makedirs("REPRENDRE/Archi")
+    except:
+        print("Le dossier REPRENDRE/Archi existe deja")
+    try:
+        os.makedirs("REPRENDRE/Weights")
+    except:
+        print("Le dossier REPRENDRE/Weights existe deja")
+    try:
+        os.makedirs('REPRENDRE/History')
+    except:
+        print("Le dossier REPRENDRE/History existe deja")
+    try:
+        os.makedirs('REPRENDRE/Resultats')
+    except:
+        print("Le dossier REPRENDRE/Resultats existe deja")
+    try:
+        os.makedirs('REPRENDRE/Resultats/Images/')
+    except:
+        print("Le dossier REPRENDRE/Resultats/Images/ existe deja")
+    print("Reprise d'un apprentissage passé")
     np.random.seed(acide)
     Mdl= load_model(Mdl2reprendre_archi)    # Chargement de l'archi
     Mdl.load_weights(Mdl2reprendre_poids)   # Chargement des poids à partir desquel on reprend l'apprentissage
     print("Chargement du modele a repreprendre effectue")
-    with open('SaveModel_reprendre/modelkhistory.pkl', 'rb') as file: 
+    with open('REPRENDRE/History/history.pkl', 'rb') as file: 
         HistoryFromReprendre=pickle.load(file)      #Chargement de l'historique des loss
     print("Chargement de l'historique des loss precedentes effectue")
     #
+    
     t0=time()
     if VALID_ON==3: # Early stopping sur l'ensemle de validation. Les poids ou
                     # le mod�le sauvgardable sont obtenus � la fin du run
@@ -521,16 +552,30 @@ elif RUN_MODE=="REPRENDRE":
         H_reprendre = Mdl.fit(x_train, y_train, verbose=2, epochs=Niter,batch_size=Bsize,
                 shuffle=True, callbacks=[earlystop], validation_data=(x_valid, y_valid))
     elif VALID_ON==4 or VALID_ON==5:
+        log_dir = "REPRENDRE/Tensorboard/logs/fit/" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+        tensorboard_callback = keras.callbacks.TensorBoard(log_dir=log_dir, histogram_freq=1)
         # 4 : Le run va jusqu'au bout. On r�cup�re, par la suite la sauvegarde
         #     des poids au meilleur de l'ensemble de validation pour les r�sultats.          
-        checkpoint_reprendre= ModelCheckpoint("TrainingFromReprendre/"+"modelkvalid.ckpt", monitor='val_loss', verbose=2,
+        checkpoint_reprendre= ModelCheckpoint("REPRENDRE/Resultats/"+"modelkvalid.ckpt", monitor='val_loss', verbose=2,
                 save_best_only=True, save_weights_only=True, mode='auto')
+        
+        callback_history=LossHistory()
+        try:
+            os.remove(history_filename)
+        except OSError:
+            print("Le fichier n'existe pas encore il n'a pas pu être supprimé")
+            pass
+        
+        callbacks_list=[checkpoint_reprendre, callback_history,tensorboard_callback] # Sauvegarde de H.history à chaque epoch
+        
         H_reprendre = Mdl.fit(x_train, y_train, verbose=2, epochs=Niter, batch_size=Bsize,
-                shuffle=True, callbacks=[checkpoint_reprendre], validation_data=(x_valid, y_valid));          
+                shuffle=True, callbacks=callbacks_list, validation_data=(x_valid, y_valid));          
+    print("Le run du mode REPRENDRE est allé jusqu'au bout des %d itérations"%(Niter))
     print("learning time : %f secondes" %(time()-t0))
+    print("Temps moyen par itération: %f secondes " %((time()-t0)/Niter))
     #
-    print("La longueur du dictionnaire de l'historique de l'apprentissage 1 est ",len(HistoryFromReprendre))
-    print("La longueur du dictionnaire de l'historique de l'apprentissage 2 est ",len(H_reprendre.history))
+    print("La longueur du dictionnaire de l'historique de l'apprentissage 1 est ",len(HistoryFromReprendre['val_loss']))
+    print("La longueur du dictionnaire de l'historique de l'apprentissage 2 est ",len(H_reprendre.history['val_loss']))
     temp_hist=HistoryFromReprendre
     for key in HistoryFromReprendre.keys():
         HistoryFromReprendre[key].extend(H_reprendre.history[key])
@@ -539,25 +584,32 @@ elif RUN_MODE=="REPRENDRE":
     plt.figure()
     LH = []
     kh = HistoryFromReprendre.keys()
-    LH.append(kh);            
-    for kle in HistoryFromReprendre.keys() :
-        hloss = HistoryFromReprendre[kle]
-        plt.plot(np.log(hloss))
-        hloss = np.reshape(hloss,(1,len(hloss)))
-        LH.append(hloss[0])               
-    plt.legend(HistoryFromReprendre.keys(), framealpha=0.3, loc=0)
-    plt.xlabel('epoch')    
-    plt.ylabel('log(loss)')
-    plt.savefig("logloss_reprendre.png")
+    LH.append(kh)
     if VALID_ON :
         valid_err_hist = HistoryFromReprendre['val_loss']
         itminval = np.argmin(valid_err_hist) 
-        print("itminval =",itminval)
+        print("La val_loss n'a pas évolué après l'itération n° "+ str(itminval))
+                
+    for kle in HistoryFromReprendre.keys() :
+        hloss = HistoryFromReprendre[kle]
+        plt.plot(np.log(hloss),alpha=0.7)
+        hloss = np.reshape(hloss,(1,len(hloss)))
+        LH.append(hloss[0])               
+    plt.legend(HistoryFromReprendre.keys(), framealpha=0.3, loc=0)
+    plt.axvline(itminval,c="black")
+    plt.xlabel('epoch')    
+    plt.ylabel('log(loss)')
+    plt.savefig("REPRENDRE/logloss_reprendre.png")
+    if VALID_ON :
+        valid_err_hist = HistoryFromReprendre['val_loss']
+        itminval = np.argmin(valid_err_hist) 
+        print("La val_loss n'a pas évolué après l'itération n° "+ str(itminval))
+        
     #
-    with open('TrainingFromReprendre/'+'modelkhistory.pkl', 'wb') as file_pi:
+    with open('REPRENDRE/Resultats/'+'history.pkl', 'wb') as file_pi:
         pickle.dump(HistoryFromReprendre, file_pi)
     if Mdl2reprendre_archi is not None:
-        Mdl.save("Model_From_Reprendre")#Sauvegarde du modèle après reprise
+        Mdl.save("REPRENDRE/Resultats/Archi_Model_From_Reprendre")#Sauvegarde du modèle après reprise
     
     
 
@@ -596,6 +648,9 @@ else : #=> RUN_MODE is "LEARN"
     elif VALID_ON==4 or VALID_ON==5 : 
         # 4 : Le run va jusqu'au bout. On r�cup�re, par la suite la sauvegarde
         #     des poids au meilleur de l'ensemble de validation pour les r�sultats.          
+        log_dir = Mdl2save+"logs/fit/" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+        tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=log_dir, histogram_freq=1)
+        
         checkpoint= ModelCheckpoint(Mdl2save+"Weights/modelkvalid.ckpt", monitor='val_loss', verbose=2,
                 save_best_only=True, save_weights_only=True, mode='auto')
         callback_history=LossHistory()
@@ -611,8 +666,8 @@ else : #=> RUN_MODE is "LEARN"
                 shuffle=True, callbacks=callbacks_list, validation_data=(x_valid, y_valid));          
     print("learning time : %f" %(time()-t0))
     print("temps moyen des" +str(Niter)+ " iterations:"+str((time()-t0)/Niter))
-    with open(Mdl2save+'history.pkl', 'wb') as file_pi:
-        pickle.dump(H.history, file_pi)
+    with open(Mdl2save+'history.pkl', 'wb') as file:
+        pickle.dump(H.history, file)
     print("L'entrainement est allé jusqu'au bout des "+str(Niter)+" itérations" )
     #
     print("#Visualisation de la courbes d'erreur en apprentissage et de performances")
@@ -635,26 +690,38 @@ else : #=> RUN_MODE is "LEARN"
         valid_err_hist = H.history['val_loss']
         itminval = np.argmin(valid_err_hist) 
         print("itminval =",itminval)
-#
+#%%
 #----------------------------------------------------------------------
 if RUN_MODE == "RESUME" :
     try : # loss history
         #LH = np.load(Mdl2reload+"lhist.npy", allow_pickle=True);
-        with open('SaveModel/modelkhistory.pkl', 'rb') as file:
+        with open('Save_Model/history.pkl', 'rb') as file:
             LH=pickle.load(file)
-        plt.figure();
-        kh = list(LH.keys());
-        for i in np.arange(len(kh))+1 :
-            hloss = LH[i];
-            plt.plot(np.log(hloss),alpha=0.7);
-        plt.legend(kh, framealpha=0.3, loc=0);
-        plt.xlabel('epoch');    plt.ylabel('log(loss)');
-        ivloss = kh.index('val_loss');
-        vloss = LH[ivloss+1];
-        itminval = np.argmin(vloss); print("itminval =",itminval);
     except :
-        print("failed when reloading file "+Mdl2reload+"lhist.npy to replot loss curves");  
-#
+        print("failed when reloading file history to replot loss curves")
+    try:
+        os.makedirs("RESUME/Images")
+    except:
+        print("Le dossier RESUME/Images existe deja")
+    plot_history_RESUME(LH)
+    #plt.figure();
+    #kh = list(LH.keys());
+    #for i in np.arange(len(kh))+1 :
+    #    hloss = LH[i];
+    #    plt.plot(np.log(hloss),alpha=0.7);
+    #plt.legend(kh, framealpha=0.3, loc=0);
+    #plt.xlabel('epoch');    plt.ylabel('log(loss)');
+    #ivloss = kh.index('val_loss');
+    #vloss = LH[ivloss+1]
+    #itminval = np.argmin(vloss); print("itminval =",itminval)
+    
+    try:
+        os.makedirs("RESUME/Images")
+    except:
+        print("Le dossier RESUME/Images existe deja")
+
+#%%
+
 #======================================================================
 #                       RESULTS ON MODEL LEARNED
 #======================================================================
@@ -668,30 +735,16 @@ if VALID_ON == 4 :
         if temp_hist['val_loss'][np.argmin(temp_hist['val_loss'])] < H_reprendre.history['val_loss'][np.argmin(H_reprendre.history['val_loss'])]:
             #Les anciens resultats sont meilleurs
             Mdl.load_weights(Mdl2reprendre_poids)
+            print("On recharge les poids précédents car la reprise n'a pas amélioré la val_loss")
         else: # Le modele reprendre a eu de meilleures performances
-            Mdl.load_weights("TrainingFromReprendre/modelkvalid.ckpt")
+            Mdl.load_weights("REPRENDRE/Resultats/modelkvalid.ckpt")
+            print("On charge les nouveaux poids après reprise car la val_loss s'est améliorée")
     else : # suppose="RESUME" : on reprend des poids d'un run pr�cedent 
-        Mdl.load_weights(Mdl2reload+"valid.ckpt");
+        #Mdl.load_weights(Mdl2reload+"valid.ckpt");
+        print("Mode "+ RUN_MODE+" les poids ont été chargés")
     print("load weights min valid, done this");
 #----------------------------------------------------------------------
 # 
-def plot_history(lhist):
-    
-    try:
-        os.makedirs(Mdl2save+"Images")
-    except:
-        print("Le dossier Images existe deja")
-    size_obj=len(lhist.history[list(lhist.history.keys())[0]])
-    x=np.linspace(0,size_obj-1,size_obj)
-    nb_loss=len(lhist.history)
-    color = ["#"+''.join([random.choice('0123456789ABCDEF') for j in range(6)]) for i in range(nb_loss)]
-    plt.figure(figsize=(16,10))
-    for i in range(nb_loss):
-        plt.plot(x,lhist.history[list(lhist.history.keys())[i]],c=color[i],label=list(lhist.history.keys())[i], alpha=0.5)
-
-    plt.legend()
-    plt.savefig("Save_Model/Images/losses_apprentissage.png",dpi=600)
-    plt.show()
 if RUN_MODE=="LEARN":  
     plot_history(H)
 
@@ -702,13 +755,17 @@ if RUN_MODE=="LEARN":
      
 def setresult(Mdl, x_set, strset, VXout_brute, calX, flag_rms=0, flag_scat=0,
               flag_histo=0, nbins=NBINS, flag_cosim=0, flag_nrj=0, flag_ens=0,
-              flag_corrplex=0, flag_div=0, dx=dxRout, dy=dyRout, wdif='log', im2show=[]) :
+              flag_corrplex=0, flag_div=0, dx=dxRout, dy=dyRout, wdif='log', im2show=[], savefig=False) :
     # Predicted coded data 
     y_scale = Mdl.predict(x_set);
+    for i in np.arange(NvarOut):
+        y_scale[i]=y_scale[i].transpose(0,3,1,2)
     if len(varOut)==1 : # Si une seule sortie mettre y_scale en forme de list comme l'est y_train
         y_scale = [y_scale];
     #BACK TO BRUTE
+
     print("%s BACK TO BRUTE"%strset);
+ 
     for i in targetout : # boucle sur les variables cibles en sortie            
         wk_ = tvwmm.index(varOut[i]);
         y_scale[i] = decodage(y_scale[i], coparmAout[i]);
@@ -717,7 +774,7 @@ def setresult(Mdl, x_set, strset, VXout_brute, calX, flag_rms=0, flag_scat=0,
             if LIMLAT_NORDSUD <= 0 :
                 result("brute scalled", strset, varOut[i], VXout_brute[i], y_scale[i],
                        flag_rms=flag_rms, flag_scat=flag_scat, flag_histo=flag_histo,
-                       nbins=nbins, calX=calX);
+                       nbins=nbins, calX=calX,savefig=savefig);
             else : # PLM, je choisis de faire que tout, ou que Nord-Sud, pour �viter
                    # de crouler sous les images
                 pipo, pipo, Nlig_, pipo = np.shape(VXout_brute[i]);
@@ -739,13 +796,14 @@ def setresult(Mdl, x_set, strset, VXout_brute, calX, flag_rms=0, flag_scat=0,
                     %(strset, varOut[i], min_, max_, moy_, std_));                   
 
         if not FIGBYPASS and len(im2show) > 0 :
-            print("taille Y_scale:",len(y_scale))
-            print("y_scale: ", np.shape(y_scale))
+            #print("taille Y_scale:",np(y_scale))
             suptitre="some %s %s_Yscalled decodee %s"%(strset, varOut[i],im2show);
+
             showsome(y_scale[i][im2show,0,:,:], wmin=wbmin[wk_], wmax=wbmax[wk_],
                      wnorm=wnorm[wk_], cmap=wcmap[wk_], calX0=calX[0][im2show], Xref=VXout_brute[i][im2show,0,:,:],
-                     wdif="", wdifr=None, varlib=varOut[i], suptitre=suptitre);                                       
-            print(); 
+                     wdif="", wdifr=None, varlib=varOut[i], suptitre=suptitre,savefig=savefig); 
+                                      
+
       
     # R�sultat sur vecteur uv ; hors de la boucle parce qu'on en a besoin que
     # d'une fois, et qu'il faut attendre la fin de la boucle pour que
@@ -759,8 +817,10 @@ def setresult(Mdl, x_set, strset, VXout_brute, calX, flag_rms=0, flag_scat=0,
         if IS_HUVout and 1 : # Vecteurs UV on H    
             suptitre = "some %s(out) H brute scalled(+uv) %s"%(strset,im2show); #! (H en dure ?)
             ih_ = showhquiv(y_scale, im2show, calX0=calX[0], Yref=VXout_brute, wdif="", 
-                            wdifr=None, suptitre=suptitre);
+                            wdifr=None, suptitre=suptitre,savefig=savefig);
+#%%
 #------------
+print("Taille de x_train: ",len(x_train))
 if FLGA_RES : # sur APP
     setresult(Mdl, x_train, "APP", VAout_brute, calA, flag_rms=FLGA_RMS,
               flag_scat=FLGA_SCAT, flag_histo=FLGA_HISTO, nbins=NBINS,
@@ -768,13 +828,30 @@ if FLGA_RES : # sur APP
               flag_corrplex=FLGA_CORRPLEX, flag_div=FLGA_DIV,
               dx=dxRout, dy=dyRout, wdif='log', im2show=im2showA);
 #------------
+
+
+#------------
+print("Taille de x_test: ",len(x_test))
+#------------
+        
+#for i in np.arange(NvarIn):
+#    x_test[i] = x_test[i].transpose(0,1,3,2)
+#for i in np.arange(NvarOut):
+#    y_test[i] = y_test[i].transpose(0,1,3,2)
+
+#%%
 if TEST_ON and FLGT_RES : # sur TEST
     setresult(Mdl, x_test, "TEST", VTout_brute, calT, flag_rms=FLGT_RMS,
               flag_scat=FLGT_SCAT, flag_histo=FLGT_HISTO, nbins=NBINS,
               flag_cosim=FLGT_COSIM, flag_nrj=FLGT_NRJ, flag_ens=FLGT_ENS,
               flag_corrplex=FLGT_CORRPLEX, flag_div=FLGT_DIV,
-              dx=dxRout, dy=dyRout, wdif='log',  im2show=im2showT);
+              dx=dxRout, dy=dyRout, wdif='log',  im2show=im2showT,savefig=SAVEFIG);
+    #setresult(Mdl, x_test, "TEST", y_test, calT, flag_rms=FLGT_RMS,
+    #          flag_scat=FLGT_SCAT, flag_histo=FLGT_HISTO, nbins=NBINS,
+    #          flag_cosim=FLGT_COSIM, flag_nrj=FLGT_NRJ, flag_ens=FLGT_ENS,
+    #          flag_corrplex=FLGT_CORRPLEX, flag_div=FLGT_DIV,
+    #          dx=dxRout, dy=dyRout, wdif='log',  im2show=im2showT);
 #------------
 plt.show();
 #======================================================================
-#
+#%%

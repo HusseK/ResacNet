@@ -20,9 +20,9 @@ dxR01, dyR01 = (1500, 1500); # "Carlos arrondis"
 # Param�tre de Visualisation (1)
 # . Some stuff
 import matplotlib as mpl #see: ../matplotlib/rcsetup.py
-mpl.rcParams['figure.facecolor'] = 'w';
-mpl.rcParams['figure.figsize']   = [12, 9];
-x_figtitlesize  = 14;
+mpl.rcParams['figure.facecolor'] = 'w'
+mpl.rcParams['figure.figsize']   = [12, 9]
+x_figtitlesize  = 14
 x_figsuptitsize = 14
 from  matplotlib import cm;
 #
@@ -55,7 +55,7 @@ im2showV  = [16]; # Avec le random, 16 de Valid est la 1�re image des donn�e
 FLAG_STAT_BASE_BRUTE     = 0;  # Statistiques de base sur les variables brutes lues (->draft, ppt)
 LIMLAT_NORDSUD           = 0;  # 0; 35 # Latitude limite de s�paration Nord-Sud
 FLAG_STAT_BASE_BRUTE_SET = 0;  # Statistiques de base des variables brutes par ensemble (->draft, ppt)
-FLAG_HISTO_VAR_BRUTE_SET = 1;  # Histogramme par variable et par ensemble (->draft, ppt)
+FLAG_HISTO_VAR_BRUTE_SET = 0;  # Histogramme par variable et par ensemble (->draft, ppt)
 NBINS                    = 45; # Default value du nombre de nbins des Histogrammes
 FLAG_DAILY_MOY_EE        = 0;  # Figures des Moyennes Journali�res par pixel pour l'Energie et l'Enstrophie
                                # (need to have U and V as output)
@@ -160,14 +160,14 @@ if (TEST_ON and pcentT<=0.0) or (VALID_ON and pcentV<=0.0) :
     raise ValueError("Your pcentT or pcentV is not OK");
 #
 if SCENARCHI > 0 :
-    RUN_MODE = "LEARN"
+    #RUN_MODE = "LEARN"
     #RUN_MODE = "REPRENDRE"
-    #RUN_MODE="RESUME"  
+    RUN_MODE="RESUME"  
              # "LEARN" : On effectue des it�rations d'apprentissage.
              # "RESUME": Les poids d'un mod�le sauvegard� pr�c�demment 
              # sont recharg�s avec le nom du param�tre Mdl2save ci-dessous
              # "REPRENDRE": reprendre l'apprentissage à partir d'un checkpoint
-             # avec les poids du modèle  
+             # avec les poids du modèle deja entrainé  
     #
     # Nom de fichier pour les poids d'un modele
     if RUN_MODE == "LEARN" :
@@ -180,18 +180,19 @@ if SCENARCHI > 0 :
             Mdl2reload = 'kmodel/kmodel_ktd3_366';  
             
         elif SCENARCHI == 2 : # RESAC avec SST
-            Mdl2reload = Mdl2save+'Weights/modelkvalid.ckpt'
+            Mdl2reload ='Save_Model/Weights/modelkvalid.ckpt'
             
         elif SCENARCHI == 3: # RESAC avec SST de 81 à 3
-            Mdl2reload = Mdl2save+'Weights/modelkvalid.ckpt'
+            Mdl2reload ='Save_Model/Weights/modelkvalid.ckpt'
         else :
             print("Scenario pas encore prevu") # Nom par d�faut, suppose avoir �t� cr�e avant
     elif RUN_MODE=="REPRENDRE":
         if SCENARCHI == 1: #RESAC sans SST
             print("Ce scenario n'est pas prévu")
-        elif SCENARCHI == 3: #RESAC AVEC SST
-            Mdl2reprendre_archi = 'SaveArchi_reprendre'
-            Mdl2reprendre_poids = 'SaveModel_reprendre/modelkvalid.ckpt'
+        elif SCENARCHI == 3: #RESAC AVEC SST 81 to 03
+            Mdl2reprendre_archi = 'REPRENDRE/Archi/'
+            Mdl2reprendre_poids = 'REPRENDRE/Weights/modelkvalid.ckpt'
+            history_filename="REPRENDRE/Resultats/history.pkl"
     else :
         raise ValueError("Bad RUN MODE");
     #
@@ -201,9 +202,9 @@ if SCENARCHI > 0 :
             raise ValueError("Are you not shure hein !");    
     #
     #Niter, Bsize = (5100, 29);
-    #Niter, Bsize  = (3, 13);
-    #Niter, Bsize = (3200,29)
-    Niter, Bsize= (2100, 29)
+    Niter, Bsize  = (5, 29);
+    #Niter, Bsize = (3400,29)
+    #Niter, Bsize= (2100, 29)
     #
     #======================================================================
     # Param�tre de Visualisation (2) des r�sultats
@@ -212,6 +213,7 @@ if SCENARCHI > 0 :
     # Pour vecteur UV : COSIM: cosine similarity  ; NRJ: energie ; 
     #                   ENS: enstrophie ; CORRPLEX: corr�lation complexe ; 
     # - Sur l'ensemble d'APP
+    SAVEFIG=True
     FLGA_RES = 0; # Resultats s/donn�es brutes (Conditionne les flags suivants)
     FLGA_RMS, FLGA_SCAT, FLGA_HISTO = \
     (   1,        1,         1);                # pour result
@@ -225,7 +227,7 @@ if SCENARCHI > 0 :
     (   0,         0,        0,           0,          0);  # pour resultuv
     #
     # Des figures ou R�sultats qu'on peut vouloir sauter.
-    FIGBYPASS = True  # figure de type imshow (showsome, ...)
+    FIGBYPASS = False  # figure de type imshow (showsome, ...)
     FIGBYIMGS = True # figure de r�sultat par image (type courbe rms, KL, ...)
     RESBYPASS = False  # sauter les r�sultats par variable de sortie (targetout)
     #
