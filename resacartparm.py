@@ -1,3 +1,10 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Mon Mar 22 15:22:04 2021
+
+@author: hmkeita
+"""
 # -*- coding: cp1252 -*-
 #----------------------------------------------------------------------
 #######################################################################
@@ -20,15 +27,15 @@ dxR01, dyR01 = (1500, 1500); # "Carlos arrondis"
 # Param�tre de Visualisation (1)
 # . Some stuff
 import matplotlib as mpl #see: ../matplotlib/rcsetup.py
-mpl.rcParams['figure.facecolor'] = 'w';
-mpl.rcParams['figure.figsize']   = [12, 9];
-x_figtitlesize  = 14;
-x_figsuptitsize = 14;
+mpl.rcParams['figure.facecolor'] = 'w'
+mpl.rcParams['figure.figsize']   = [12, 9]
+x_figtitlesize  = 14
+x_figsuptitsize = 14
 from  matplotlib import cm;
 #
 # . D�finition des norms et �chelles d'affichage des variables
-tvwmm  = ["SSH",  "SST",  "SSU",  "SSV",   "NRJ",     "ENS",   "ADD",  "MUL"];
-wnorm  = [ None,  None,   None,   None,    "Log",     "Log",    None,  None];
+tvwmm  = ["SSH",  "SST",  "U",  "V",   "NRJ",     "ENS",   "ADD",  "MUL"];
+wnorm  = [ None,  None,   None,   None,    None,     None,    None,  None];
 wbmin  = [-0.67,  -2.30,  -2.25,  -2.50, 4.0849e-10, 3.868e-25,  0.0,   0.0 ]; 
 wbmax  = [ 1.36,  30.00,   2.60,   2.35,   3.52,     1.158e-09, 3.52,  1.34e-09];
 #wdmin = [-0.27,  None,   None,   None,   -9.00,    -24.00]; # Bornes vmin, vmax pour les ...
@@ -47,7 +54,7 @@ wcmap = [cm.jet, cm.jet, cm.jet, cm.jet, cm.jet, cm.jet];
 # . S�lection de quelques images � afficher par leur indices dans leur ensemble respectif
 # (256APP, 55VAL, 55TEST), sachant qu'ils ont �t� randomis�s
 im2showA  = [0];  # pour APP 
-im2showT  = [24]; # Pour Test (Art - Pres)
+im2showT  = [46];#24 1er Septembre # Pour Test (Art - Pres)
                   # 0: 18 aout 2013 ; 28: 23 juin 2013 ; 24: 1er septembre 2013 
 im2showV  = [16]; # Avec le random, 16 de Valid est la 1�re image des donn�es [0] correspondant au 1.10.2012
 #
@@ -55,7 +62,7 @@ im2showV  = [16]; # Avec le random, 16 de Valid est la 1�re image des donn�e
 FLAG_STAT_BASE_BRUTE     = 0;  # Statistiques de base sur les variables brutes lues (->draft, ppt)
 LIMLAT_NORDSUD           = 0;  # 0; 35 # Latitude limite de s�paration Nord-Sud
 FLAG_STAT_BASE_BRUTE_SET = 0;  # Statistiques de base des variables brutes par ensemble (->draft, ppt)
-FLAG_HISTO_VAR_BRUTE_SET = 1;  # Histogramme par variable et par ensemble (->draft, ppt)
+FLAG_HISTO_VAR_BRUTE_SET = 0;  # Histogramme par variable et par ensemble (->draft, ppt)
 NBINS                    = 45; # Default value du nombre de nbins des Histogrammes
 FLAG_DAILY_MOY_EE        = 0;  # Figures des Moyennes Journali�res par pixel pour l'Energie et l'Enstrophie
                                # (need to have U and V as output)
@@ -95,7 +102,7 @@ acide = 0;  # seed plac� pour l'init de l'architecture
 # Ps: loss='logcosh' and optimizer='adam' are in DURE in the code
 #
 #----------------------------------------------------------------------
-SCENARCHI = 2;  # 0 : Produire des figures sur les donn�es brute
+SCENARCHI = 4;  # 0 : Produire des figures sur les donn�es brute
                 #     sans faire de  CNN.
                 # 1 : CNN Resac_inf (EXP1=EXP_ssh); 
                 # 2 : CNN Resac (EXP2=EXP_ssh_sst);
@@ -124,12 +131,25 @@ if SCENARCHI == 0 : # Pour produire des figures � diff�rentes r�solutions
     varIn   = ["SSH"];                          varOut  = ["SSH"];    
     ResoIn  = [ 81];                            ResoOut = [ 27  ];
 elif SCENARCHI == 1 : #RESAC_inf (sans SST) 'kmodel/kmodel_ktd3_366';
-    varIn     = ["SSH"];                    varOut  = ["SSH","SSH","SSU","SSV"];
+    varIn     = ["SSH"];                    varOut  = ["SSH","SSH","U","V"];
     ResoIn    = [  81];                     ResoOut = [  27,   9,    9,    9];
     targetout = [1, 2, 3];
-elif SCENARCHI == 2 : #RESAC (avec SST) #'kmodel/kmodel_ktd10_366'; 402113w
-    varIn  = ["SSH","SST","SST"];           varOut  = ["SSH","SSH","SSU","SSV"];
+elif SCENARCHI == 2 : #RESAC (avec SST) #'kmodel/kmodel_ktd10_366'; 402113w # 
+    #                          RESAC 81 TO 09                             #
+    varIn  = ["SSH","SST","SST"];           varOut  = ["SSH","SSH","U","V"];
     ResoIn = [  81,  27,    9 ];            ResoOut = [  27,   9,    9,    9];
+    targetout = [1, 2, 3];
+
+elif SCENARCHI == 3 : #RESAC (avec SST) #'kmodel/kmodel_ktd10_366'; 402113w
+    #                          RESAC 81 TO 03
+    varIn  = ["SSH","SST","SST","SST"];           varOut  = ["SSH","SSH","SSH","U","V"];
+    ResoIn = [  81,  27,    9,    3];            ResoOut =  [  27,   9,    3,    3,    3];
+    targetout = [1, 2, 3, 4];
+    
+elif SCENARCHI == 4:
+    #
+    varIn  = ["SSH","SST","SST","SST","SST"];           varOut  = ["SSH","SSH","SSH","SSH"];
+    ResoIn = [  81,  27,    9,    3,    1];            ResoOut =  [  27,   9,    3,     1];
     targetout = [1, 2, 3];
 else :
     raise ValueError("Create another archi");
@@ -153,34 +173,55 @@ if (TEST_ON and pcentT<=0.0) or (VALID_ON and pcentV<=0.0) :
     raise ValueError("Your pcentT or pcentV is not OK");
 #
 if SCENARCHI > 0 :
-    RUN_MODE = "LEARN";  
+    #RUN_MODE = "LEARN"
+    #RUN_MODE = "REPRENDRE"
+    RUN_MODE = "RESUME"  
              # "LEARN" : On effectue des it�rations d'apprentissage.
              # "RESUME": Les poids d'un mod�le sauvegard� pr�c�demment 
-             # sont recharg�s avec le nom du param�tre Mdl2save ci-dessous 
+             # sont recharg�s avec le nom du param�tre Mdl2save ci-dessous
+             # "REPRENDRE": reprendre l'apprentissage à partir d'un checkpoint
+             # avec les poids du modèle deja entrainé  
     #
     # Nom de fichier pour les poids d'un modele
     if RUN_MODE == "LEARN" :
         # Nom du du fichier � sauvegarder
-        Mdl2save = 'SaveModel/modelk'; # Nom par defaut
+        Mdl2save = 'Save_Model/'; # Nom par defaut
+        history_filename=Mdl2save+"Historique_Loss/modelkhistory.pkl"
     elif RUN_MODE == "RESUME" :
         # Nom du du fichier � recharger 
         if SCENARCHI == 1 :   # RESAC sans SST
-            Mdl2reload = 'kmodel/kmodel_ktd3_366';    
+            Mdl2reload = 'kmodel/kmodel_ktd3_366';  
+            
         elif SCENARCHI == 2 : # RESAC avec SST
-            Mdl2reload = 'SaveModel/modelk'
+            Mdl2reload ='Save_Model/Weights/modelkvalid.ckpt'
+            
+        elif SCENARCHI == 3: # RESAC avec SST de 81 à 3
+            Mdl2reload ='Save_Model/Weights/modelkvalid.ckpt'
+            
+        elif SCENARCHI == 4: # RESAC avec SST de 81 à 1
+            Mdl2reload ='Save_Model/Weights/modelkvalid.ckpt'
+        
         else :
-            Mdl2reload = 'SaveModel/modelk'; # Nom par d�faut, suppose avoir �t� cr�e avant
+            print("Scenario pas encore prevu") # Nom par d�faut, suppose avoir �t� cr�e avant
+    elif RUN_MODE=="REPRENDRE":
+        if SCENARCHI == 1: #RESAC sans SST
+            print("Ce scenario n'est pas prévu")
+        elif SCENARCHI == 3: #RESAC AVEC SST 81 to 03
+            Mdl2reprendre_archi = 'REPRENDRE/Archi/'
+            Mdl2reprendre_poids = 'REPRENDRE/Weights/modelkvalid.ckpt'
+            history_filename="REPRENDRE/Resultats/history.pkl"
     else :
         raise ValueError("Bad RUN MODE");
     #
-    if RUN_MODE == "LEARN" and Mdl2save != "SaveModel/modelk" :   
+    if RUN_MODE == "LEARN" and Mdl2save != "Save_Model/" :   
         _rep = input("Are you shure ? : "); 
         if _rep != 1 :
             raise ValueError("Are you not shure hein !");    
     #
-    Niter, Bsize = (5100, 29);
-    #Niter, Bsize  = (3, 13);
-    #Niter, Bsize=(20,10)
+    #Niter, Bsize = (5100, 29);
+    #Niter, Bsize  = (5, 29)
+    #Niter, Bsize = (3400,29)
+    Niter, Bsize= (4777, 29)
     #
     #======================================================================
     # Param�tre de Visualisation (2) des r�sultats
@@ -189,6 +230,8 @@ if SCENARCHI > 0 :
     # Pour vecteur UV : COSIM: cosine similarity  ; NRJ: energie ; 
     #                   ENS: enstrophie ; CORRPLEX: corr�lation complexe ; 
     # - Sur l'ensemble d'APP
+    SAVEFIG=True
+    FLGT_SCAT_BORDER=1
     FLGA_RES = 0; # Resultats s/donn�es brutes (Conditionne les flags suivants)
     FLGA_RMS, FLGA_SCAT, FLGA_HISTO = \
     (   1,        1,         1);                # pour result
@@ -202,7 +245,7 @@ if SCENARCHI > 0 :
     (   0,         0,        0,           0,          0);  # pour resultuv
     #
     # Des figures ou R�sultats qu'on peut vouloir sauter.
-    FIGBYPASS = True  # figure de type imshow (showsome, ...)
+    FIGBYPASS = False  # figure de type imshow (showsome, ...)
     FIGBYIMGS = True # figure de r�sultat par image (type courbe rms, KL, ...)
     RESBYPASS = False  # sauter les r�sultats par variable de sortie (targetout)
     #

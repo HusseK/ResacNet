@@ -1,7 +1,17 @@
-# -*- coding: cp1252 -*-
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Mon Mar 22 15:23:01 2021
+
+@author: hmkeita
+"""
+# -*- coding: utf-8 -*-
 from __future__ import print_function
 import os
 import sys
+import pickle
+import random
+import math
 from   time  import time
 import numpy as     np
 import matplotlib as mpl #see: ../matplotlib/rcsetup.py
@@ -10,6 +20,12 @@ from   matplotlib import cm
 import matplotlib.colorbar as cb
 from   matplotlib.colors import LogNorm
 from   scipy.stats import norm
+import mpl_scatter_density
+from matplotlib.colors import LinearSegmentedColormap
+from matplotlib.colors import Normalize 
+from scipy.interpolate import interpn
+from matplotlib.cm import ScalarMappable
+from keras.callbacks import Callback
 from   resacartparm  import *
 #=====================================================================
 # Traitement post param�trage
@@ -25,7 +41,7 @@ if SCENARCHI>0 :
 NvarIn    = len(varIn);     NvarOut= len(varOut);
 IS_UVout  = False;
 IS_HUVout = False;
-if "SSU" in varOut and "SSV" in varOut :
+if "U" in varOut and "V" in varOut :
     IS_UVout  = True;    
     if "SSH" in varOut :
         IS_HUVout = True;   
@@ -294,7 +310,7 @@ def plotavar (Xi, titre, wnorm, wmin, wmax, cmap=CMAP_DEF, calX0i=None, Xiref=No
 #--------------------------------------------------
 def showsome(X, wmin=None,wmax=None,wnorm=None, cmap=CMAP_DEF, fsize=(19,8),
              calX0=None, Xref=None, wdif=None, wdifr=None, varlib="",
-             suptitre="", Xtit="Est.", vdmin=None, vdmax=None) :
+             suptitre="", Xtit="Est.", vdmin=None, vdmax=None, savefig=False) :
     #print("-- in showsome --");
     if wmin==None :
         wmin = np.min(X);
@@ -316,16 +332,34 @@ def showsome(X, wmin=None,wmax=None,wnorm=None, cmap=CMAP_DEF, fsize=(19,8),
         else :
             titre = plotavar (X[i], titre, wnorm, wmin, wmax, cmap=cmap, calX0i=calX0[i]); 
         plt.title(titre, fontsize=x_figtitlesize);
+        titre= "estimation"+varlib
+        if savefig==True:
+            if RUN_MODE=="RESUME":
+                plt.savefig("RESUME/Images/"+titre+".png")
+            elif RUN_MODE=="LEARN":
+                plt.savefig(Mdl2save+"Images/"+titre+".png")
+            elif RUN_MODE=="REPRENDRE":
+                titre+="REPRENDRE"
+                plt.savefig("REPRENDRE/Resultats/Images/"+titre+".png")
+        
     plt.suptitle(suptitre,fontsize=x_figsuptitsize);
 
     if Xref is not None : # TRUE VALUE (valeurs de r�f�rence)
         plt.figure(figsize=fsize);
         for i in np.arange(n) :
-            titre="Ref. : "+varlib+" ";
+            titre="Ref"+varlib+" ";
             plt.subplot(subl,subc,i+1);
             titre = plotavar (Xref[i], titre, wnorm, wmin, wmax, cmap=cmap, calX0i=calX0[i]);
             plt.title(titre, fontsize=x_figtitlesize);
         plt.suptitle(suptitre,fontsize=x_figsuptitsize);
+        if savefig==True:
+            if RUN_MODE=="RESUME":
+                plt.savefig("RESUME/Images/"+titre+".png")
+            elif RUN_MODE=="LEARN":
+                plt.savefig(Mdl2save+"Images/"+titre+".png")
+            elif RUN_MODE=="REPRENDRE":
+                titre+="REPRENDRE"
+                plt.savefig("REPRENDRE/Resultats/Images/"+titre+".png")
     #
     #wdif : "": ref-est ; "log": log(ref)-log(est) ; "dlog": log(ref-est) ; "dalog" : log(abs(ref-est))
     #
@@ -333,7 +367,7 @@ def showsome(X, wmin=None,wmax=None,wnorm=None, cmap=CMAP_DEF, fsize=(19,8),
         if wdif is not None : #DIFFERENCES
             plt.figure(figsize=fsize);            
             for i in np.arange(n) :
-                titre = "Dif. : "+varlib+" ";
+                titre = "Dif"+varlib+" ";
                 plt.subplot(subl,subc,i+1);                       
                 titres = showdiff(Xref[i], X[i], relatif=False, wdif=wdif,
                                   cmap=cmap, vdmin=vdmin, vdmax=vdmax);
@@ -342,10 +376,18 @@ def showsome(X, wmin=None,wmax=None,wnorm=None, cmap=CMAP_DEF, fsize=(19,8),
                     titre = titre + calX0[i];
                 plt.title(titre, fontsize=x_figtitlesize);
             plt.suptitle(suptitre,fontsize=x_figsuptitsize);
+            if savefig==True:
+                if RUN_MODE=="RESUME":
+                    plt.savefig("RESUME/Images/"+titre+".png")
+                elif RUN_MODE=="LEARN":
+                    plt.savefig(Mdl2save+"Images/"+titre+".png")
+                elif RUN_MODE=="REPRENDRE":
+                    titre+="REPRENDRE"
+                    plt.savefig("REPRENDRE/Resultats/Images/"+titre+".png")
         if wdifr is not None : #DIFFERENCES RELATIVES
             plt.figure(figsize=fsize);
             for i in np.arange(n) :
-                titre = "Dif. Rel. : "+varlib+" ";
+                titre = "Dif. Rel "+varlib+" ";
                 plt.subplot(subl,subc,i+1);           
                 titres = showdiff(Xref[i], X[i], relatif=True, wdif=wdifr,
                                   cmap=cmap, vdmin=vdmin, vdmax=vdmax);
@@ -354,13 +396,22 @@ def showsome(X, wmin=None,wmax=None,wnorm=None, cmap=CMAP_DEF, fsize=(19,8),
                     titre = titre + calX0[i];
                 plt.title(titre, fontsize=x_figtitlesize);
             plt.suptitle(suptitre,fontsize=x_figsuptitsize);
+            if savefig==True:
+                if RUN_MODE=="RESUME":
+                    plt.savefig("RESUME/Images/"+titre+".png")
+                elif RUN_MODE=="LEARN":
+                    plt.savefig(Mdl2save+"Images/"+titre+".png")
+                elif RUN_MODE=="REPRENDRE":
+                    titre+="REPRENDRE"
+                    plt.savefig("REPRENDRE/Resultats/Images/"+titre+".png")
+
 #----------------------------------------------------------------------
 def showquivmask (Ui, Vi, qscale=None, qmask=None, qmode=None) :
     print("-- in showquivmask --");
     Nlig, Ncol = np.shape(Ui); # Une seul image a la fois, m�me shape assumed
     UU_ = np.ones((Nlig, Ncol)) * np.nan;
     VV_ = np.ones((Nlig, Ncol)) * np.nan;
-    reso_    = NLigR01/Nlig; #=NColR01/Ncol
+    reso_    = (NLigR01//Nlig); #=NColR01/Ncol
     iquv  = quvreso.index(reso_);
     if qmask is None :
         qmask  = quvmask[iquv];
@@ -411,7 +462,7 @@ def showquivmaskdiff (Uiref, Viref, Uiest, Viest, qscale=None,
 #--------------------------------------------------
 def showxquiv(X, U, V, qscale=None, qmask=None, qmode=None, xvmin=None,
               xvmax=None, xvnorm=None, cmap=CMAP_DEF, fsize=(20,9), calX0=None, 
-              Xref=None, Uref=None, Vref=None, wdif=None, wdifr=None, suptitre="") :
+              Xref=None, Uref=None, Vref=None, wdif=None, wdifr=None, suptitre="",savefig=False) :
     print("-- in showxquiv --");
     # qmode : 1: 'step sinon 'moyenne'
     # qmask : Si qmode!=1, en attendant de revoir la fonction makemoy,
@@ -429,7 +480,7 @@ def showxquiv(X, U, V, qscale=None, qmask=None, qmode=None, xvmin=None,
     # VALEURS ESTIMEES (h+quiv(uv))
     plt.figure(figsize=fsize);
     for i in np.arange(Nimg) :
-        titre="Est.. ";
+        titre="Est. ";
         plt.subplot(subl,subc,i+1);
         plt.imshow(X[i], interpolation='none', cmap=cmap, vmin=xvmin, vmax=xvmax, origin=origine);
         plt.colorbar(orientation='horizontal');
@@ -437,21 +488,31 @@ def showxquiv(X, U, V, qscale=None, qmask=None, qmode=None, xvmin=None,
         if 1 : # Avoir d�finit les coordonn�es g�ographique par r�solution une fois pour toute
             plt.xticks(xxticks, lxticks); plt.xlabel("longitude");
             plt.yticks(yyticks, lyticks); plt.ylabel("latitude");
-            titre = titre + "R%d(%dx%d)\n"%(reso_,Nlig,Ncol);
+            titre = titre + "R%d(%dx%d)"%(reso_,Nlig,Ncol);
         if calX0 is not None :
             titre = titre + calX0[i];
         if Xref is not None : # On suppose que c'est idem pour Uref et Vref
             RMSX, Nnan, inan = nanrms(Xref[i], X[i]);
             RMSU, Nnan, inan = nanrms(Uref[i], U[i]);
             RMSV, Nnan, inan = nanrms(Vref[i], V[i]);
-            titre = titre + " rmsH=%.4e, \nrmsU=%.4e, rmsV=%.4e"%(RMSX,RMSU,RMSV);
+            if savefig==True:
+                if RUN_MODE=="RESUME":
+                    plt.savefig("RESUME/Images/"+titre+".png")
+                elif RUN_MODE=="LEARN":
+                    plt.savefig(Mdl2save+"Images/"+titre+".png")
+                elif RUN_MODE=="REPRENDRE":
+                    titre+="REPRENDRE"
+                    plt.savefig("REPRENDRE/Resultats/Images/"+titre+".png")
+            titre = titre + " rmsH=%.4e, rmsU=%.4e, rmsV=%.4e"%(RMSX,RMSU,RMSV);
         plt.title(titre, fontsize=x_figtitlesize);
+        #titre="estimation"+varlue[i]+"R%d(%dx%d)"%(reso_,Nlig,Ncol)
+        
     plt.suptitle(suptitre,fontsize=x_figsuptitsize);
     if Xref is not None : # On suppose que c'est idem pour Uref et Vref
         # VALEUR de REFERENCE (True) (h+quiv(uv))
         plt.figure(figsize=fsize);
         for i in np.arange(Nimg) :
-            titre="Ref.. ";
+            titre="Ref. ";
             plt.subplot(subl,subc,i+1);
             plt.imshow(Xref[i], interpolation='none', cmap=cmap, vmin=xvmin, vmax=xvmax, origin=origine);
             plt.colorbar(orientation='horizontal');
@@ -466,6 +527,15 @@ def showxquiv(X, U, V, qscale=None, qmask=None, qmode=None, xvmin=None,
                 titre = titre + calX0[i];
             plt.title(titre, fontsize=x_figtitlesize);
         plt.suptitle(suptitre,fontsize=x_figsuptitsize);
+        if savefig==True:
+            if RUN_MODE=="RESUME":
+                plt.savefig("RESUME/Images/"+titre+".png")
+            elif RUN_MODE=="LEARN":
+                plt.savefig(Mdl2save+"Images/"+titre+".png")
+            elif RUN_MODE=="REPRENDRE":
+                titre+="REPRENDRE"
+                plt.savefig("REPRENDRE/Resultats/Images/"+titre+".png")
+
         #
         if wdif is not None :   # DIFFERENCES (h+quiv(uv))
             ivar_ = tvwmm.index("SSH");
@@ -473,7 +543,7 @@ def showxquiv(X, U, V, qscale=None, qmask=None, qmode=None, xvmin=None,
             vdmax = wdmax[ivar_];
             plt.figure(figsize=fsize);
             for i in np.arange(Nimg) :
-                titre="Dif.. ";
+                titre="Dif. ";
                 plt.subplot(subl,subc,i+1);
                 titres = showdiff(Xref[i], X[i], cmap=cmap, relatif=False,
                                   wdif=wdif, vdmin=vdmin, vdmax=vdmax);
@@ -484,11 +554,19 @@ def showxquiv(X, U, V, qscale=None, qmask=None, qmode=None, xvmin=None,
                     titre = titre + calX0[i];
                 plt.title(titre, fontsize=x_figtitlesize);
             plt.suptitle(suptitre,fontsize=x_figsuptitsize);
+            if savefig==True:
+                if RUN_MODE=="RESUME":
+                    plt.savefig("RESUME/Images/"+titre+".png")
+                elif RUN_MODE=="LEARN":
+                    plt.savefig(Mdl2save+"Images/"+titre+".png")
+                elif RUN_MODE=="REPRENDRE":
+                    titre+="REPRENDRE"
+                    plt.savefig("REPRENDRE/Resultats/Images/"+titre+".png")
 
         if wdifr is not None :  # DIFFERENCES RELATIVES (h+quiv(uv))
             plt.figure(figsize=fsize);
             for i in np.arange(Nimg) :
-                titre="Dif.. Rel. SSH +(U,V) ";
+                titre="Dif. Rel. SSH +(U,V) ";
                 plt.subplot(subl,subc,i+1);
                 titres = showdiff(Xref[i], X[i], cmap=cmap, relatif=True,
                                   wdif=wdifr, vdmin=vdmin, vdmax=vdmax);
@@ -499,14 +577,22 @@ def showxquiv(X, U, V, qscale=None, qmask=None, qmode=None, xvmin=None,
                     titre = titre + calX0[i];
                 plt.title(titre, fontsize=x_figtitlesize);
             plt.suptitle(suptitre,fontsize=x_figsuptitsize);
+            if savefig==True:
+                if RUN_MODE=="RESUME":
+                    plt.savefig("RESUME/Images/"+titre+".png")
+                elif RUN_MODE=="LEARN":
+                    plt.savefig(Mdl2save+"Images/"+titre+".png")
+                elif RUN_MODE=="REPRENDRE":
+                    titre+="REPRENDRE"
+                    plt.savefig("REPRENDRE/Resultats/Images/"+titre+".png")
 #--------------------------------------------------
 def showhquiv(Voutb, im2show, qscale=None, qmask=None, qmode=None,
-              fsize=(20,9), calX0=None, Yref=None, wdif=None, wdifr=None, suptitre="") : 
+              fsize=(20,9), calX0=None, Yref=None, wdif=None, wdifr=None, suptitre="",savefig=False) : 
     #print("-- in showhquiv --");
     if calX0 is not None :
         calX0_ = calX0[im2show];
-    iu_ = varOut.index("SSU");
-    iv_ = varOut.index("SSV");
+    iu_ = varOut.index("U");
+    iv_ = varOut.index("V");
     ih_ = varOut.index("SSH",np.min([iu_,iv_])-1); # le dernier h avant u et v        
     H_  = Voutb[ih_][im2show,0,:,:];
     U_  = Voutb[iu_][im2show,0,:,:];
@@ -520,7 +606,7 @@ def showhquiv(Voutb, im2show, qscale=None, qmask=None, qmode=None,
     showxquiv(H_, U_, V_, qscale=qscale, qmask=qmask, qmode=qmode, 
               xvmin=wbmin[wk_], xvmax=wbmax[wk_], xvnorm=wnorm[wk_], cmap=wcmap[wk_],
               fsize=fsize, calX0=calX0_, Xref=Href_, Uref=Uref_, Vref=Vref_,
-              wdif=wdif, wdifr=wdifr, suptitre=suptitre);
+              wdif=wdif, wdifr=wdifr, suptitre=suptitre,savefig=savefig);
     return ih_;
 #----------------------------------------------------------------------
 def rms(Xref, Xest) :
@@ -608,7 +694,7 @@ def setresolution(VA_brute,VV_brute,VT_brute,varlue,ResoIn,ResoOut) :
         VTout_brute.append(dvar);            
     print("... making V*in_Brute");
     VAin_brute = []; VVin_brute = []; VTin_brute = [];
-    for i in np.arange(NvarIn) : #varIn['SSH', 'SST', 'SST']
+    for i in np.arange(NvarIn) : #varIn['SSH', 'SST', 'SST', 'SST']
         idvar = varlue.index(varIn[i])
         dvar  = VA_brute[idvar];
         if ResoIn[i] > 1 :
@@ -668,24 +754,44 @@ def histodbl(Xref, Xest, legende, nbins=NBINS) :
     plt.legend(legende, framealpha=0.5);
     return
 #--------------------------------------------------
-def scatplot (Xref, Xest, ident=True, regr2=True, mksz=3.0, linewidth=2.0) :
+def scatplot (Xref, Xest, ident=True, regr2=True, mksz=3.0, linewidth=2.0, enquete=False) :
     # Scatter plot
     mpl.rcParams['agg.path.chunksize'] = 1000000;
     plt.figure();
-    plt.plot(Xref, Xest, '.g', markersize=mksz); 
+    plt.grid()
+    plt.plot(Xref, Xest, '.g', markersize=mksz)
     minim=np.nanmin([Xref, Xest]); maxim=np.nanmax([Xref, Xest]);
     plt.xlabel("NATL60"); plt.ylabel("RESAC");
     if ident : # ligne de l'identit�
         plt.plot([minim, maxim], [minim, maxim], '-m',linewidth=linewidth);
     if regr2 : # r�gression + R2
         b0, b1, R2 = linr2(Xref, Xest);
-        xmin=min(Xref); xmax=max(Xref);
+        xmin=np.min(Xref); xmax=np.max(Xref);
         xr = np.arange(xmin, xmax,(xmax-xmin)/200); #[xmin:(xmax-xmin)/200:xmax]';  
         yr = b1*xr + b0;
         plt.plot(xr, yr, '-b',linewidth=2.0);
         plt.legend(["", "id", "rl"], numpoints=1, loc='upper left',framealpha=0.5);
         return b0, b1, R2;
     return
+def scatplot_border(Xref, Xest, mino,maxo,ident=True, regr2=True, mksz=3.0, linewidth=2.0,width=3):
+    pix_bords=pixels_border(Xref,width=width)
+    plt.plot(Xref,Xest,"x",c="green",markersize=mksz)
+    for a,b in pix_bords:
+        plt.plot(Xref[a,b],Xest[a,b],"x",c="red")
+    #minim=np.nanmin([Xref, Xest]); maxim=np.nanmax([Xref, Xest]);
+    minim=mino
+    maxim=maxo
+    plt.xlabel("NATL60"); plt.ylabel("RESAC");
+    if ident : # ligne de l'identit�
+        plt.plot([minim, maxim], [minim, maxim], '-m',linewidth=linewidth,label= "Identité");
+    if regr2 : # r�gression + R2
+        b0, b1, R2 = linr2(Xref, Xest);
+        return b0, b1, R2;
+    return    
+    
+    
+    
+
 #--------------------------------------------------
 def setbins(mmax, mmin, nbins) :
     epsi  = abs(mmax)/100000;
@@ -693,9 +799,14 @@ def setbins(mmax, mmin, nbins) :
     bins  = np.arange(mmin, mmaxX, (mmax-mmin)/nbins);
     bins[-1] = bins[-1] + epsi;
     return bins
+
 def getrticks (Nlig) :
     # get r�solution et ticks
-    reso    = NLigR01/Nlig; #=NColR01/NC_
+    #print("NLigR01: ",NLigR01)
+    #print("NLig: ",Nlig)
+    reso    = (NLigR01//Nlig) #=NColR01/NC_ #####A reprendre#######
+    #print("Reso:",reso)
+    #print("ResoAll:",ResoAll)
     icoord  = ResoAll.index(reso);
     xxticks, lxticks, yyticks, lyticks = CoordGeo[icoord];
     return reso, xxticks, lxticks, yyticks, lyticks    
@@ -720,18 +831,20 @@ def splitns (X, NL_lim) :
         XN = X[:,:,NL_lim:Nlig,:];
     return XN, XS;
 #--------------------------------------------------
-def result(lib, strset, varname, Yref, Yest, flag_rms=0, flag_scat=0,
-           flag_histo=0, nbins=NBINS, calX=None) :
+def result(lib, strset, varname, Yref, Yest, flag_rms=0, flag_scat=0,flag_scat_border=0,
+           flag_histo=0, nbins=NBINS, calX=None,savefig=False) :
     print("-- in result --"); #print(np.shape(Yref)); #(55L, 1L, 144L, 153L)
     # Au moins toujours la RMS qui est affich�e par ailleurs
+    Nall_ = np.prod(np.shape(Yest));
     N_ = len(Yref); Allrmsi = [];
     for i in np.arange(N_) :
         rmsi, Nnan, inan = nanrms(Yref[i], Yest[i]);
         Allrmsi.append(rmsi);
     moyAllrmsi = np.mean(Allrmsi);
-    titres_ = "%s %s %s, RMS by image, Mean : %.4f\n min=%.4f, max=%.4f, std=%.4f" \
-               %(strset, varname, lib, moyAllrmsi, np.min(Allrmsi), np.max(Allrmsi), np.std(Allrmsi));
-    nom_save="%s_%s_%s_RMS_BY_IMAGE"%(strset, varname, lib)
+    titres_ = "%s %s %s, RMS by image (%d pixels), Mean : %.4f\n min=%.4f, max=%.4f, std=%.4f" \
+               %(strset, varname, lib,Nall_, moyAllrmsi, np.min(Allrmsi), np.max(Allrmsi), np.std(Allrmsi));
+    nom_save="%s_%s_%s_RMS_BY_IMAGE_(%d pixels)"%(strset, varname, lib,Nall_)
+    
     print(titres_);
     #
     if flag_rms and FIGBYIMGS : # figure RMS par image
@@ -746,25 +859,115 @@ def result(lib, strset, varname, Yref, Yest, flag_rms=0, flag_scat=0,
             #horizontalalignment='right', verticalalignment='baseline')          
         plt.plot([0,N_-1],[moyAllrmsi, moyAllrmsi]); # Trait de la moyenne
         plt.title(titres_, fontsize=x_figtitlesize);
-        plt.savefig("Images/"+nom_save+".png")       
-    #
-    Nall_ = np.prod(np.shape(Yest));
+        if savefig==True:
+            if RUN_MODE=="RESUME":
+                nom_save+="RESUME"
+                plt.savefig("RESUME/Images/"+nom_save+".png")
+            elif RUN_MODE=="REPRENDRE":
+                nom_save+="REPRENDRE"
+                plt.savefig("REPRENDRE/Resultats/Images/"+nom_save+".png")
+            else:
+                plt.savefig(Mdl2save+"Images/"+nom_save+".png")
+        #
+    
     Yref_ = Yref.ravel();
     Yest_ = Yest.ravel();
-    #                  
+    
+    fig=plt.figure(figsize=(16,16))
+    density_scatter(Yref[0,0].ravel(), Yest[0,0].ravel(),fig)
+    nom_save_density0="density10OctR%d"%((NLigR01//np.shape(Yref[i,0])[0]))
+    if savefig==True:
+            if RUN_MODE== "RESUME":
+                nom_save_density0+="RESUME"
+                plt.savefig("RESUME/Images/"+nom_save_density0+"scatt_density.png")
+                
+            elif RUN_MODE=="REPRENDRE":
+                nom_save_density0+="REPRENDRE"
+                plt.savefig("REPRENDRE/Resultats/Images/"+nom_save_density0+"scatt_density.png")
+            else:
+                plt.savefig(Mdl2save+"Images/"+nom_save_density0+"scatt_density.png")
+    fig=plt.figure(figsize=(16,16))
+    density_scatter(Yref[24,0].ravel(), Yest[24,0].ravel(),fig)
+    nom_save_density24="density1SepR%d"%((NLigR01//np.shape(Yref[i,0])[0]))
+    if savefig==True:
+            if RUN_MODE== "RESUME":
+                nom_save_density24+="RESUME"
+                plt.savefig("RESUME/Images/"+nom_save_density24+"scatt_density.png")
+                
+            elif RUN_MODE=="REPRENDRE":
+                nom_save_density24+="REPRENDRE"
+                plt.savefig("REPRENDRE/Resultats/Images/"+nom_save_density24+"scatt_density.png")
+            else:
+                plt.savefig(Mdl2save+"Images/"+nom_save_density24+"scatt_density.png")
+    
+    
+    
+    fig=plt.figure(figsize=(16,16))
+    density_scatter(Yref_, Yest_,fig)
+    nom_save_density="densityR%d"%((NLigR01//np.shape(Yref[i,0])[0]))
+    if savefig==True:
+            if RUN_MODE== "RESUME":
+                nom_save_density+="RESUME"
+                plt.savefig("RESUME/Images/"+nom_save_density+"scatt_density.png")
+                
+            elif RUN_MODE=="REPRENDRE":
+                nom_save_density+="REPRENDRE"
+                plt.savefig("REPRENDRE/Resultats/Images/"+nom_save_density+"scatt_density.png")
+            else:
+                plt.savefig(Mdl2save+"Images/"+nom_save_density+"scatt_density.png")
+                                       
+    
+    #
+    if flag_scat_border:
+        plt.figure()
+        for i in range (np.shape(Yref)[0]):
+            pipo,pipo,R2 = scatplot_border(Yref[i,0],Yest[i,0],mino=np.nanmin([Yref, Yest]),maxo=np.nanmax([Yref, Yest]),width=1)
+            
+        b0, b1, R2 = linr2(Yref, Yest);
+        xmin=np.min(Yref_)
+        xmax=np.max(Yref_)
+        xr = np.arange(xmin, xmax,(xmax-xmin)/200); #[xmin:(xmax-xmin)/200:xmax]';  
+        yr = b1*xr + b0;
+        plt.plot(xr, yr, '-b',linewidth=2.0,label="Droite de regression")
+        plt.title("R%d%s %s %s scatter plot (%d pixels)\n mean(rms)=%.6f, R2=%f"
+                  %(NLigR01//np.shape(Yref[i,0])[0],strset, varname, lib, Nall_, moyAllrmsi, R2), fontsize=x_figtitlesize);
+        nom_save_bords="R%d%s_%s_%sscatter_plot_(%d_pixels)"%(NLigR01//np.shape(Yref[i,0])[0],strset, varname, lib, Nall_)
+        
+        if savefig==True:
+            if RUN_MODE== "RESUME":
+                nom_save_bords+="RESUME"
+                plt.savefig("RESUME/Images/"+nom_save_bords+"scatt_border.png")
+                
+            elif RUN_MODE=="REPRENDRE":
+                nom_save_bords+="REPRENDRE"
+                plt.savefig("REPRENDRE/Resultats/Images/"+nom_save_bords+"scatt_border.png")
+            else:
+                plt.savefig(Mdl2save+"Images/"+nom_save_bords+"scatt_border.png")
+        
+
+                  
     if flag_scat :     # Scatter plot
         pipo, pipo, R2 = scatplot (Yref_, Yest_);
         plt.title("%s %s %s scatter plot (%d pixels)\n mean(rms)=%.6f, R2=%f"
                   %(strset, varname, lib, Nall_, moyAllrmsi, R2), fontsize=x_figtitlesize);
         nom_save2="%s_%s_%sscatter_plot_(%d_pixels)"%(strset, varname, lib, Nall_)
-        plt.savefig("Images/"+nom_save2+"scatt.png")
+        if savefig==True:
+            if RUN_MODE== "RESUME":
+                nom_save2+="RESUME"
+                plt.savefig("RESUME/Images/"+nom_save2+"scatt.png")
+                
+            elif RUN_MODE=="REPRENDRE":
+                nom_save2+="REPRENDRE"
+                plt.savefig("REPRENDRE/Resultats/Images/"+nom_save2+"scatt.png")
+            else:
+                plt.savefig(Mdl2save+"Images/"+nom_save2+"scatt.png")
 
     if flag_histo : # Histogramme des diff�rences
-        Ydif_ = Yref_-Yest_;
-        wk_   = tvwmm.index(varname);
+        Ydif_ = Yref_-Yest_
+        wk_   = tvwmm.index(varname)
         # Positionnement des min et max d'erreur (Forcage des bins sur EXP1)
         mmin = whdmin[wk_];  mmax = whdmax[wk_]; 
-        bins = setbins(mmax, mmin, nbins);
+        bins = setbins(mmax, mmin, nbins)
         
         if 0 : # Histo non Normalis�
             plt.figure();
@@ -774,7 +977,16 @@ def result(lib, strset, varname, Yref, Yest, flag_rms=0, flag_scat=0,
             plt.title("%s %s %s Histo des differences (Ref.-Est.)\n(%dbins)(%d pixels(%dnans) %dloss), mean(rms)=%.6f"
                       %(strset, varname, lib, nbins, Nall_, Nnan, Nall_-sum(BI[0]), moyAllrmsi), fontsize=x_figtitlesize);
             nom_save3="%s_%s_%s_Histo_des_differences"%(strset, varname, lib)
-            plt.savefig("Images/"+nom_save3+"histo_non_norm.png")
+            if savefig==True:  
+                if RUN_MODE== "RESUME":
+                    nom_save3+="RESUME"
+                    plt.savefig("RESUME/Images/"+nom_save3+"histo_non_norm.png")
+                    
+                elif RUN_MODE=="REPRENDRE":
+                    nom_save3+="REPRENDRE"
+                    plt.savefig("REPRENDRE/Resultats/Images/"+nom_save3+"histo_non_norm.png")
+                else:
+                    plt.savefig(Mdl2save+"Images/"+nom_save3+"histo_non_norm.png")
 
         # Histogramme Normalis�
         plt.figure();
@@ -792,10 +1004,19 @@ def result(lib, strset, varname, Yref, Yest, flag_rms=0, flag_scat=0,
         y      = norm.pdf(Centre, ymoy, ystd);
         plt.plot(Centre, y, '-*r', linewidth=3);
         plt.axis([mmin, mmax, 0, NBmax_]);
-        plt.title("%s %s %s Histo Normalise des Diff.(Ref.-Est.)\n mean=%f, std=%f, mean(rms)=%.6f"
-                  %(strset, varname, lib, np.mean(Ydif_), np.std(Ydif_), moyAllrmsi));
+        plt.title("%s %s %s Histo Normalise des Diff.(Ref.-Est.)\n mean=%f, std=%f, %dpixels mean(rms)=%.6f"
+                  %(strset, varname, lib, np.mean(Ydif_), np.std(Ydif_),Nall_, moyAllrmsi));
         nom_save4="%s_%s_%s_Histo_Normalise_des_Diff"%(strset, varname, lib)
-        plt.savefig("Images/"+nom_save4+"histo_norm.png")                    
+        if savefig==True:
+            if RUN_MODE== "RESUME":
+                nom_save4+="RESUME"
+                plt.savefig("RESUME/Images/"+nom_save4+"histo_norm.png")
+            
+            elif RUN_MODE=="REPRENDRE":
+                nom_save4+="REPRENDRE"
+                plt.savefig("REPRENDRE/Resultats/Images/"+nom_save4+"histo_norm.png")
+            else:
+                plt.savefig(Mdl2save+"Images/"+nom_save4+"histo_norm.png")
 #
 #----------------------------------------------------------------------      
 def distcosine2D (Wref, West) : # Matrix way
@@ -1089,8 +1310,8 @@ def resultuv(Yrefout, Yestout, strset, flag_cosim=0, flag_nrj=0,
              flag_ens=0, flag_corrplex=0, flag_div=0, dx=dxRout, dy=dyRout,
              flag_scat=0, flag_histo=0, calX=None, wdif='log', nbins=NBINS) :
     print("-- in resultuv --");
-    iu_ = varOut.index("SSU");  Urefout = Yrefout[iu_];  Uestout = Yestout[iu_];
-    iv_ = varOut.index("SSV");  Vrefout = Yrefout[iv_];  Vestout = Yestout[iv_];       
+    iu_ = varOut.index("U");  Urefout = Yrefout[iu_];  Uestout = Yestout[iu_];
+    iv_ = varOut.index("V");  Vrefout = Yrefout[iv_];  Vestout = Yestout[iv_];       
     if LIMLAT_NORDSUD <= 0 :
         UVresult(Urefout, Vrefout, Uestout, Vestout, strset, flag_cosim=flag_cosim,
                  flag_nrj=flag_nrj, flag_ens=flag_ens,
@@ -1119,7 +1340,142 @@ def resultuv(Yrefout, Yestout, strset, flag_cosim=0, flag_nrj=0,
              flag_nrj=flag_nrj, flag_ens=flag_ens,
              flag_corrplex=flag_corrplex, flag_div=flag_div, dx=dx, dy=dy,
              flag_scat=flag_scat, flag_histo=flag_histo, calX=calX,
-             wdif=wdif, nbins=nbins); 
+             wdif=wdif, nbins=nbins);
+#--------------------------------------------------
+  
+def plot_history(H):
+    try:
+        os.makedirs(Mdl2save+"Images")
+    except:
+        print("Le dossier Images existe deja")
+    plt.figure(figsize=(16,10))
+    LH = []
+    kh = H.history.keys()
+    LH.append(kh);            
+    for kle in H.history.keys() :
+        hloss = H.history[kle]
+        plt.plot(np.log(hloss),alpha=0.8)
+        hloss = np.reshape(hloss,(1,len(hloss)))
+        LH.append(hloss[0])               
+    plt.legend(H.history.keys(), framealpha=0.3, loc=0)
+    plt.xlabel('epoch')    
+    plt.ylabel('log(loss)')
+    if VALID_ON :
+        valid_err_hist = H.history['val_loss']
+        itminval = np.argmin(valid_err_hist) 
+        print("itminval =",itminval)
+        plt.axvline(itminval,c="black")
+        print("La val_loss n'a pas baissé à partir de l'itération n° "+str(itminval))
+    plt.savefig(Mdl2save+"Images/loss.png")
+# def plot_history(lhist):
+#     lhist=lhist.history
+#     try:
+#         os.makedirs(Mdl2save+"Images")
+#     except:
+#         print("Le dossier Images existe deja")
+#     size_obj=len(lhist.history[list(lhist.history.keys())[0]])
+#     x=np.linspace(0,size_obj-1,size_obj)
+#     nb_loss=len(lhist.history)
+#     color = ["#"+''.join([random.choice('0123456789ABCDEF') for j in range(6)]) for i in range(nb_loss)]
+#     plt.figure(figsize=(16,10))
+#     for i in range(nb_loss):
+#         plt.plot(x,lhist.history[list(lhist.history.keys())[i]],c=color[i],label=list(lhist.history.keys())[i], alpha=0.5)
+
+#     plt.xlabel("Epochs")
+#     plt.ylabel("Log(Loss)")
+#     itminval=np.argmin(lhist['val_loss'])
+#     plt.axvline(itminval,c="black")
+#     print("La val_loss n'a pas baissé à partir de l'itération n° "+str(itminval))
+#     plt.legend()
+#     plt.savefig("Save_Model/Images/losses_apprentissage.png")
+#     #plt.show()
+
+def density_scatter(x, y,fig):
+    white_viridis = LinearSegmentedColormap.from_list('white_viridis', 
+    [(0, '#ffffff'),
+    (1e-20, '#0000DF'),
+    (0.2, '#00BFFF'),
+    (0.4, '#3FFFBF'),
+    (0.6, '#FFEF00'),
+    (0.8, '#FF3F00'),
+    (1, '#AF0000'), ], 
+    N=256)
+
+    ax = fig.add_subplot(1, 1, 1, projection='scatter_density')
+    density = ax.scatter_density(x, y, cmap=white_viridis)
+    fig.colorbar(density, label='Nombre de points par pixel')
+    
+
+def pixels_border(img,width=3):
+    res=[]
+    for i in range(img.shape[0]):
+        for j in range(img.shape[1]):
+            if i>img.shape[0]-width:
+                res.append((i,j))
+            elif j>img.shape[1]-width:
+                res.append((i,j))
+            elif i<width:
+                res.append((i,j))
+            elif j < width:
+                res.append((i,j))
+    return res
+
+def is_border(img,i,j,width=3):
+    if i>img.shape[0]-width:
+        return True
+    if j>img.shape[1]-width:
+        return True
+    if i<width:
+        return True
+    if j < width:
+        return True
+    return False
+
+
+def plot_history_RESUME(lhist):
+    size_obj=len(lhist[list(lhist.keys())[0]])
+    x=np.linspace(0,size_obj-1,size_obj)
+    nb_loss=len(lhist)
+    plt.figure(figsize=(16,10))
+    for i in range(nb_loss):
+        plt.plot(x,np.log(lhist[list(lhist.keys())[i]]),label=list(lhist.keys())[i], alpha=0.7)
+    plt.xlabel("Epochs")
+    plt.ylabel("Log(Loss)")
+    itminval=np.argmin(lhist['val_loss'])
+    plt.axvline(itminval,c="black")
+    print("La val_loss n'a pas baissé à partir de l'itération n° "+str(itminval))
+    plt.legend()
+    plt.savefig("RESUME/Images/loss.png")
+    #plt.show()
+
+def saveHist(path, history):
+    with open(path, 'wb') as file:
+        pickle.dump(history, file)
+#--------------------------------------------------
+def appendHist(h1, h2):
+    if h1 == {}:
+        return h2
+    else:
+        dest = {}
+        for key, value in h1.items():
+            dest[key] = value + h2[key]
+        return dest
+#--------------------------------------------------
+class LossHistory(Callback):
+  
+    def on_epoch_end(self, epoch, logs = None):
+        new_history={}
+        for k, v in logs.items(): # compile new history from logs
+            new_history[k] = [v] # convert values into lists
+        try:
+            with open(history_filename, 'rb') as file:
+                old_history=pickle.load(file)
+        except:
+            print("Fail au moment du chargement du fichier "+history_filename)
+            old_history={}
+    
+
+        saveHist(history_filename, appendHist(old_history,new_history)) # save history from current training             
 #**********************************************************************
 #----------------------------------------------------------------------
 #
